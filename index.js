@@ -7,41 +7,36 @@ var mkdirp = require('mkdirp');
 var is = require('type-is');
 var qs = require('qs');
 
-module.exports = function(options) {
-
-  options = options || {};
-  options.includeEmptyFields = options.includeEmptyFields || false;
-  options.inMemory = options.inMemory || false;
-  options.putSingleFilesInArray = options.putSingleFilesInArray || false;
-
-  // if the destination directory does not exist then assign uploads to the operating system's temporary directory
-  var dest;
-
-  if (options.dest) {
-    dest = options.dest;
-  } else {
-    dest = os.tmpdir();
-  }
-
-  mkdirp(dest, function(err) { if (err) throw err; });
-
-  // renaming function for the destination directory
-  var changeDest = options.changeDest || function(dest, req, res) {
-    return dest;
-  };
-
-  // renaming function for the uploaded file - need not worry about the extension
-  // ! if you want to keep the original filename, write a renamer function which does that
-  var rename = options.rename || function(fieldname, filename, req, res) {
-    var random_string = fieldname + filename + Date.now() + Math.random();
-    return crypto.createHash('md5').update(random_string).digest('hex');
-  };
-
-  return function(req, res, next) {
-
-    var readFinished = false;
+function multer(req, res, options){
+	
+	options = options || {};
+	options.includeEmptyFields = options.includeEmptyFields || false;
+	options.inMemory = options.inMemory || false;
+	options.putSingleFilesInArray = options.putSingleFilesInArray || false;
+	
+	var readFinished = false;
     var fileCount = 0;
+	
+	var dest;
+	if (options.dest) {
+		dest = options.dest;
+	} else {
+		dest = os.tmpdir();
+	}
+	// renaming function for the destination directory
+	var changeDest = options.changeDest || function(dest, req, res) {
+		return dest;
+	};
 
+	// renaming function for the uploaded file - need not worry about the extension
+	// ! if you want to keep the original filename, write a renamer function which does that
+	var rename = options.rename || function(fieldname, filename, req, res) {
+	var random_string = fieldname + filename + Date.now() + Math.random();
+		return crypto.createHash('md5').update(random_string).digest('hex');
+	};
+	
+	mkdirp(dest, function(err) { if (err) throw err; });
+	
     req.body = req.body || {};
     req.files = req.files || {};
 
@@ -89,24 +84,24 @@ module.exports = function(options) {
         newFilename = rename(fieldname, filename.replace(ext, ''), req, res) + ext;
         newFilePath = path.join(changeDest(dest, req, res), newFilename);
 
-        var file = {
-          fieldname: fieldname,
-          originalname: filename,
-          name: newFilename,
-          encoding: encoding,
-          mimetype: mimetype,
-          path: newFilePath,
-          extension: (ext === '') ? '' : ext.replace('.', ''),
-          size: 0,
-          truncated: null,
-          buffer: null
-        };
+		var file = {
+			fieldname: fieldname,
+			originalname: filename,
+			name: newFilename,
+			encoding: encoding,
+			mimetype: mimetype,
+			path: newFilePath,
+			extension: (ext === '') ? '' : ext.replace('.', ''),
+			size: 0,
+			truncated: null,
+			buffer: null
+		};
 
         // trigger "file upload start" event
         if (options.onFileUploadStart) {
           var proceed = options.onFileUploadStart(file, req, res);
           // if the onFileUploadStart handler returned null, it means we should proceed further, discard the file!
-          if (proceed == false) {
+          if (proceed === false) {
             fileCount--;
             return fileStream.resume();
           }
@@ -208,15 +203,11 @@ module.exports = function(options) {
 
         // when done parsing the form, pass the control to the next middleware in stack
         if (options.onParseEnd) { options.onParseEnd(req, next); }
-        else { next(); }
       };
 
       req.pipe(busboy);
 
     }
-
-    else { return next(); }
-
-  }
-
 }
+
+module.exports = multer;
